@@ -1,23 +1,35 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"net/http"
 	"os"
 )
 
 func main() {
+	repo, err := newRepository()
+	if err != nil {
+		fmt.Println("Error during DB connection:", err)
+		os.Exit(1)
+	}
 
-	stockSymbols, err := getSymbols()
+	if err := repo.initDB(); err != nil {
+		fmt.Println("Error during DB initialization:", err)
+		os.Exit(1)
+	}
+
+	stockSymbols, err := getSymbols(repo)
 	if err != nil {
 		fmt.Println("Error during symbols retrieval:", err)
+		os.Exit(1)
+	}
+	if len(stockSymbols) == 0 {
+		fmt.Println("No stocks in DB, and no stocks provided. Provide stocks symbols.")
 		os.Exit(1)
 	}
 
 	prices := make(map[string]float64)
 
-	for _, stockSymbol := range stockSymbols {
+	for stockSymbol := range stockSymbols {
 		price, err := getPrice(stockSymbol)
 		if err != nil {
 			fmt.Println("Error during price retrieval:", err)
@@ -26,43 +38,45 @@ func main() {
 		prices[stockSymbol] = price
 	}
 
+	err = repo.insertSymbols(prices)
+	if err != nil {
+		fmt.Println("Error during price saving attempt:", err)
+		os.Exit(1)
+	}
+
+	prices, err = repo.getPrices()
+	if err != nil {
+		fmt.Println("Error during price retrieval from DB:", err)
+		os.Exit(1)
+	}
+
 	fmt.Println("Last close prices of your stocks:")
 	for symbol, price := range prices {
 		fmt.Printf("%s: %.2f\n", symbol, price)
 	}
 
+	defer repo.db.Close()
+
 }
 
-func getSymbols() ([]string, error) {
+func getSymbols(repo *Repository) (map[string]bool, error) {
 	var symbols []string
 	if len(os.Args) >= 2 {
 		symbols = append(symbols, os.Args[1:]...)
 	}
 
-	// TODO add DB symbols to symbols slice
-
-	return symbols, nil
-}
-
-type ClosePrice struct {
-	Date  string  `json:"date"`
-	Close float64 `json:"close"`
-}
-
-func getPrice(symbol string) (float64, error) {
-	token := os.Getenv("TIINGO_API_TOKEN")
-	uri := fmt.Sprintf("https://api.tiingo.com/tiingo/daily/%s/prices?token=%s&columns=close", symbol, token)
-	resp, err := http.Get(uri)
+	dbSymbols, err := repo.getDBSymbols()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	defer resp.Body.Close()
 
-	var priceObj []ClosePrice
-	err = json.NewDecoder(resp.Body).Decode(&priceObj)
-	if err != nil {
-		return 0, err
+	symbols = append(symbols, dbSymbols...)
+
+	symbolsMap := make(map[string]bool)
+
+	for _, s := range symbols {
+		symbolsMap[s] = true
 	}
-	price := priceObj[0].Close
-	return price, nil
+
+	return symbolsMap, nil
 }
