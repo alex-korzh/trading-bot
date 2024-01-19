@@ -14,6 +14,9 @@ type ClosePrice struct {
 
 func getPrice(symbol string) (float64, error) {
 	token := os.Getenv("TIINGO_API_TOKEN")
+	if token == "" {
+		return 0, fmt.Errorf("TIINGO_API_TOKEN env variable is not set")
+	}
 	uri := fmt.Sprintf("https://api.tiingo.com/tiingo/daily/%s/prices?token=%s&columns=close", symbol, token)
 	resp, err := http.Get(uri)
 	if err != nil {
