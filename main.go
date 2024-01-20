@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 )
 
 func main() {
@@ -49,10 +50,13 @@ func main() {
 		fmt.Println("Error during price retrieval from DB:", err)
 		os.Exit(1)
 	}
-
-	fmt.Println("Last close prices of your stocks:")
+	fmt.Println("Strategy decided on your stocks:")
 	for symbol, price := range prices {
-		fmt.Printf("%s: %.2f\n", symbol, price)
+		decision, err := RandomStrategy(symbol, PricePoint{price: price, date: time.Now()})
+		if err != nil {
+			fmt.Printf("Error during decision making for %f", price)
+		}
+		fmt.Printf("%s: %.2f, decision: %s\n", symbol, price, decision)
 	}
 
 	defer repo.db.Close()

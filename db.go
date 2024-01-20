@@ -2,7 +2,6 @@ package main
 
 import (
 	"database/sql"
-	"fmt"
 	"math"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -72,8 +71,6 @@ func (r *Repository) insertSymbols(symbols map[string]float64) error {
 				if err != nil {
 					return err
 				}
-			} else {
-				fmt.Printf("Skipped updating %s\n", symbol)
 			}
 			delete(symbols, symbol)
 		}
